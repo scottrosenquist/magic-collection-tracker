@@ -7,6 +7,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.ViewGroup;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -18,13 +21,10 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
 
 public class CardsInSet extends AppCompatActivity {
     private CollectionHelper collectionHelper;
     private JSONObject rawSetData;
-    private List<CardObj> cards = new ArrayList<>();
     private RecyclerView cardsRecyclerView;
     private CardsInSetAdapter cardsAdapter;
     private RecyclerView.LayoutManager cardsLayoutManager;
@@ -32,8 +32,8 @@ public class CardsInSet extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        collectionHelper = new CollectionHelper(getApplicationContext());
-        setContentView(R.layout.activity_list);
+        collectionHelper = new CollectionHelper(getApplicationContext(), CardsInSet.this);
+        setContentView(R.layout.cards_list);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         if (toolbar != null) {
             setSupportActionBar(toolbar);
@@ -52,29 +52,42 @@ public class CardsInSet extends AppCompatActivity {
 
         try {
             rawSetData = new JSONObject(getIntent().getStringExtra("set_data"));
-            toolbar.setTitle(rawSetData.optString("name"));
+            if (toolbar != null) {
+                getSupportActionBar().setTitle(rawSetData.optString("name"));
+            }
         } catch (JSONException e) {
             e.printStackTrace();
         }
 
-            cardsRecyclerView = (RecyclerView) findViewById(R.id.list);
-            cardsRecyclerView.hasFixedSize();
+        cardsRecyclerView = (RecyclerView) findViewById(R.id.list);
+        cardsRecyclerView.hasFixedSize();
 
-            cardsLayoutManager = new LinearLayoutManager(this);
-            cardsRecyclerView.setLayoutManager(cardsLayoutManager);
+        cardsLayoutManager = new LinearLayoutManager(this);
+        cardsRecyclerView.setLayoutManager(cardsLayoutManager);
 
-            cardsAdapter = new CardsInSetAdapter(getLayoutInflater(),rawSetData.optString("code"));
-            new LoadAllCards(cardsAdapter).execute();
-            cardsRecyclerView.setAdapter(cardsAdapter);
+        cardsAdapter = new CardsInSetAdapter(getLayoutInflater(),rawSetData.optString("name"));
+
+        cardsRecyclerView.setAdapter(new RecyclerView.Adapter() {
+            @Override
+            public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+                return null;
+            }
+
+            @Override
+            public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+
+            }
+
+            @Override
+            public int getItemCount() {
+                return 0;
+            }
+        });
+        new LoadAllCards().execute();
     }
 
     private class LoadAllCards extends AsyncTask<Void, Integer, Void> {
-        private CardsInSetAdapter cardsInSetAdapter;
         private ProgressDialog progressDialog;
-
-        public LoadAllCards(CardsInSetAdapter cardsInSetAdapter) {
-            this.cardsInSetAdapter = cardsInSetAdapter;
-        }
 
         @Override
         protected void onPreExecute() {
@@ -112,7 +125,7 @@ public class CardsInSet extends AppCompatActivity {
                         fileName = "seventh"+alphanumeric[1];
                         break;
                     case "8":
-                        fileName = "eight"+alphanumeric[1];
+                        fileName = "eighth"+alphanumeric[1];
                         break;
                     case "9":
                         fileName = "ninth"+alphanumeric[1];
@@ -130,7 +143,9 @@ public class CardsInSet extends AppCompatActivity {
                     if(reader.nextName().equals("cards")) {
                         reader.beginArray();
                         while (reader.hasNext()) {
-                            cards.add(new CardObj(new JSONObject(gson.fromJson(reader, JsonObject.class).toString())));
+                            JSONObject rawCardData = new JSONObject(gson.fromJson(reader, JsonObject.class).toString());
+                            CardObj card = new CardObj(rawCardData);
+                            cardsAdapter.addCard(card);
                             loadedCards++;
                             publishProgress(loadedCards);
                         }
@@ -149,7 +164,7 @@ public class CardsInSet extends AppCompatActivity {
         @Override
         protected void onPostExecute(Void result)
         {
-            cardsInSetAdapter.addAllCards(cards);
+            cardsRecyclerView.setAdapter(cardsAdapter);
             progressDialog.dismiss();
         }
 
@@ -158,25 +173,29 @@ public class CardsInSet extends AppCompatActivity {
         }
     }
 
-//    @Override
-//    public boolean onCreateOptionsMenu(Menu menu) {
-//        // Inflate the menu; this adds items to the action bar if it is present.
-//        getMenuInflater().inflate(R.menu.menu_sets, menu);
-//        return true;
-//    }
-//
-//    @Override
-//    public boolean onOptionsItemSelected(MenuItem item) {
-//        // Handle action bar item clicks here. The action bar will
-//        // automatically handle clicks on the Home/Up button, so long
-//        // as you specify a parent activity in AndroidManifest.xml.
-//        int id = item.getItemId();
-//
-//        //noinspection SimplifiableIfStatement
-//        if (id == R.id.action_settings) {
-//            return true;
-//        }
-//
-//        return super.onOptionsItemSelected(item);
-//    }
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_sets, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+        int id = item.getItemId();
+
+        //noinspection SimplifiableIfStatement
+        if (id == R.id.export_to_deckbox_csv) {
+            collectionHelper.exportToDeckboxCsv();
+        } else if (id == R.id.import_from_deckbox_csv) {
+            collectionHelper.importFromDeckboxCsv();
+        } else if (id == R.id.clear_collection) {
+            collectionHelper.clearCollection();
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
 }

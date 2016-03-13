@@ -1,9 +1,5 @@
 package com.scottrosenquist.magiccollectiontracker;
 
-import android.util.Log;
-
-import com.google.gson.JsonObject;
-
 import org.json.JSONObject;
 
 public class SetObj {

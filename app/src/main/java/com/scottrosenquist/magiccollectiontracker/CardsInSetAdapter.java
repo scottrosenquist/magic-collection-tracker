@@ -1,19 +1,25 @@
 package com.scottrosenquist.magiccollectiontracker;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.res.ColorStateList;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.CompoundButtonCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.util.SortedList;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.util.SortedListAdapterCallback;
-import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.NumberPicker;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,9 +27,9 @@ import java.util.List;
 
 public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.ViewHolder> {
     private Context viewContext;
-    CollectionHelper collectionHelper;
+    private CollectionHelper collectionHelper;
+    private JSONObject initialQuantityCollection;
     private SortedList<CardObj> cardsDataset;
-    private final LayoutInflater layoutInflater;
     private final int COLOURLESS = 0;
     private final int WHITE = 1;
     private final int BLUE = 2;
@@ -33,7 +39,7 @@ public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.Vi
     private final int GOLD = 6;
     private final int ARTIFACT = 7;
     private final int LAND = 8;
-    private String setCode;
+    private String setName;
 
     // Provide a reference to the views for each data item
     // Complex data items may need more than one view per item, and
@@ -48,20 +54,20 @@ public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.Vi
     }
 
     // Provide a suitable constructor (depends on the kind of dataset)
-    public CardsInSetAdapter(LayoutInflater layoutInflater, String setCode) {
-        this.layoutInflater = layoutInflater;
+    public CardsInSetAdapter(LayoutInflater layoutInflater, String setName) {
         viewContext = layoutInflater.getContext();
-        collectionHelper = new CollectionHelper(viewContext);
+        collectionHelper = new CollectionHelper(viewContext.getApplicationContext(),viewContext);
+        initialQuantityCollection = collectionHelper.getSetCollection(setName);
         cardsDataset = new SortedList<>(CardObj.class, sortedListAdapterCallback(this));
-        this.setCode = setCode;
+        this.setName = setName;
     }
 
     private SortedListAdapterCallback<CardObj> sortedListAdapterCallback(android.support.v7.widget.RecyclerView.Adapter adapter) {
         return new SortedListAdapterCallback<CardObj>(adapter) {
             @Override
             public int compare(CardObj o1, CardObj o2) {
-                int number1=0;
-                int number2=0;
+                int number1;
+                int number2;
                 try {
                     number1 = Integer.parseInt(o1.getNumber());
                     number2 = Integer.parseInt(o2.getNumber());
@@ -125,22 +131,18 @@ public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.Vi
     public CardsInSetAdapter.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         // create a new view
         CardView v = (CardView) LayoutInflater.from(parent.getContext()).inflate(R.layout.card_list_item, parent, false);
-        ViewHolder vh = new ViewHolder(v);
-        return vh;
+        return new ViewHolder(v);
     }
 
     // Replace the contents of a view (invoked by the layout manager)
     @Override
-    public void onBindViewHolder(ViewHolder holder, int position) {
+    public void onBindViewHolder(final ViewHolder holder, int position) {
         // - get element from your dataset at this position
         // - replace the contents of the view with that element
 
         final CardObj card = cardsDataset.get(position);
         final String cardName = card.getName();
-        List<String> cardColours = card.getColours();
-        List<String> cardTypes = card.getTypes();
 
-        CardView cardView = (CardView) holder.mainView.findViewById(R.id.card_view);
         RadioButton cardColour = (RadioButton) holder.mainView.findViewById(R.id.card_colour);
         TextView cardNameTextView = ((TextView) holder.mainView.findViewById(R.id.card_name));
         final RadioGroup cardSelection = (RadioGroup) holder.mainView.findViewById(R.id.radioButtons);
@@ -176,9 +178,7 @@ public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.Vi
             @Override
             public void onCheckedChanged(RadioGroup group, int checkedId) {
                 if (group.findViewById(checkedId) != null && group.findViewById(checkedId).isPressed()) {
-                    Log.d("scottdebug","Human Interferance");
-                    int quantity = 0;
-                    boolean foil = false;
+                    int quantity = -1;
                     switch (checkedId) {
                         case R.id.radioButton1:
                             quantity = 1;
@@ -192,37 +192,129 @@ public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.Vi
                         case R.id.radioButton4:
                             quantity = 4;
                             break;
-                        case R.id.radioButton5:
-                            quantity = 0;
-                            cardSelection.clearCheck();
-                            break;
                     }
-                    collectionHelper.setCardQuantity(setCode, cardName, quantity, foil);
-                    card.setQuantity(quantity);
+                    if (quantity != -1) {
+                        collectionHelper.setCardQuantity(setName, cardName, quantity, 0);
+                        card.setQuantity(quantity);
+                        card.setQuantityFoil(0);
+                    }
+
                 }
             }
         });
 
-        cardSelection.clearCheck();
-        switch (card.getQuantity()) {
-            case 0:
-                cardSelection.clearCheck();
-                break;
-            case 1:
-                radioButton1.setChecked(true);
-                break;
-            case 2:
-                radioButton2.setChecked(true);
-                break;
-            case 3:
-                radioButton3.setChecked(true);
-                break;
-            case 4:
-                radioButton4.setChecked(true);
-                break;
-            default:
-                radioButton5.setChecked(true);
-                break;
+        radioButton5.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                View dialoglayout = View.inflate(v.getContext(), R.layout.quantity_picker, null);
+                final NumberPicker quantityPicker = (NumberPicker) dialoglayout.findViewById(R.id.quantityPicker);
+                quantityPicker.setMinValue(0);
+                quantityPicker.setMaxValue(1000);
+                quantityPicker.setValue(card.getQuantity());
+                quantityPicker.setWrapSelectorWheel(false);
+                final NumberPicker quantityFoilPicker = (NumberPicker) dialoglayout.findViewById(R.id.quantityFoilPicker);
+                quantityFoilPicker.setMinValue(0);
+                quantityFoilPicker.setMaxValue(1000);
+                quantityFoilPicker.setValue(card.getQuantityFoil());
+                quantityFoilPicker.setWrapSelectorWheel(false);
+                AlertDialog.Builder builder = new AlertDialog.Builder(v.getContext());
+                builder.setView(dialoglayout);
+                builder.setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        int quantity = quantityPicker.getValue();
+                        int quantityFoil = quantityFoilPicker.getValue();
+                        collectionHelper.setCardQuantity(setName, cardName, quantity, quantityFoil);
+                        card.setQuantity(quantity);
+                        card.setQuantityFoil(quantityFoil);
+                        if (quantityFoil > 0 || quantity > 4) {
+                            radioButton5.setChecked(true);
+                        } else {
+                            switch (quantity) {
+                                case 0:
+                                    cardSelection.clearCheck();
+                                    break;
+                                case 1:
+                                    radioButton1.setChecked(true);
+                                    break;
+                                case 2:
+                                    radioButton2.setChecked(true);
+                                    break;
+                                case 3:
+                                    radioButton3.setChecked(true);
+                                    break;
+                                case 4:
+                                    radioButton4.setChecked(true);
+                                    break;
+                                default:
+                                    cardSelection.clearCheck();
+                                    break;
+                            }
+                        }
+                    }
+                });
+                builder.setNeutralButton("Cancel", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (card.getQuantityFoil() > 0 || card.getQuantity() > 4) {
+                            radioButton5.setChecked(true);
+                        } else {
+                            switch (card.getQuantity()) {
+                                case 0:
+                                    cardSelection.clearCheck();
+                                    break;
+                                case 1:
+                                    radioButton1.setChecked(true);
+                                    break;
+                                case 2:
+                                    radioButton2.setChecked(true);
+                                    break;
+                                case 3:
+                                    radioButton3.setChecked(true);
+                                    break;
+                                case 4:
+                                    radioButton4.setChecked(true);
+                                    break;
+                                default:
+                                    cardSelection.clearCheck();
+                                    break;
+                            }
+                        }
+                    }
+                });
+                builder.setNegativeButton("Clear", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        collectionHelper.setCardQuantityZero(setName, cardName);
+                        card.setQuantity(0);
+                        card.setQuantityFoil(0);
+                        cardSelection.clearCheck();
+                    }
+                });
+                builder.create().show();
+            }
+        });
+
+        if (card.getQuantityFoil() > 0 || card.getQuantity() > 4) {
+            radioButton5.setChecked(true);
+        } else {
+            switch (card.getQuantity()) {
+                case 0:
+                    cardSelection.clearCheck();
+                    break;
+                case 1:
+                    radioButton1.setChecked(true);
+                    break;
+                case 2:
+                    radioButton2.setChecked(true);
+                    break;
+                case 3:
+                    radioButton3.setChecked(true);
+                    break;
+                case 4:
+                    radioButton4.setChecked(true);
+                    break;
+                default:
+                    cardSelection.clearCheck();
+                    break;
+            }
         }
     }
 
@@ -233,11 +325,19 @@ public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.Vi
     }
 
     public void addCard(CardObj cardObj) {
-        cardObj.setQuantity(collectionHelper.getCardQuantity(setCode,cardObj.getName()));
+        if (initialQuantityCollection.has(cardObj.getName())) {
+            try {
+                JSONObject rawCardData = initialQuantityCollection.getJSONObject(cardObj.getName());
+                cardObj.setQuantity(rawCardData.optInt("Quantity"));
+                cardObj.setQuantityFoil(rawCardData.optInt("QuantityFoil"));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+        }
         List<String> ignoreCardsNamed = new ArrayList<>(Arrays.asList("Plains", "Island", "Swamp", "Mountain", "Forest"));
         if (!ignoreCardsNamed.contains(cardObj.getName())) {
             try {
-                Integer.parseInt(cardObj.getNumber());
                 cardsDataset.add(cardObj);
             } catch (NumberFormatException e) {
                 if (cardObj.getNumber().equals("")) {
@@ -249,12 +349,6 @@ public class CardsInSetAdapter extends RecyclerView.Adapter<CardsInSetAdapter.Vi
                     }
                 }
             }
-        }
-    }
-
-    public void addAllCards(List<CardObj> cards) {
-        for (CardObj card : cards) {
-            addCard(card);
         }
     }
 }

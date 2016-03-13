@@ -37,6 +37,7 @@
                 android:ellipsize="end"
                 android:lines="1"
                 tools:text="Black Lotus Black Lotus Black Lotus"/>
+
         </RelativeLayout>
 
         <RadioGroup
@@ -46,31 +47,37 @@
             android:layout_centerVertical="true"
             android:layout_below="@id/card_name_container"
             android:orientation="horizontal">
+
             <RadioButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="1"
                 android:id="@+id/radioButton1" />
+
             <RadioButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="2"
                 android:id="@+id/radioButton2" />
+
             <RadioButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="3"
                 android:id="@+id/radioButton3" />
+
             <RadioButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="4"
                 android:id="@+id/radioButton4" />
+
             <RadioButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="5+"
                 android:id="@+id/radioButton5" />
+
         </RadioGroup>
 
     </RelativeLayout>
